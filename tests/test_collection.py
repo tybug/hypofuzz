@@ -68,3 +68,14 @@ def test_does_not_collect_explicit_fixture_even_if_autouse():
     """
 
     assert collect_names(code) == set()
+
+
+def test_collects_parameterized_tests():
+    code = """
+    @pytest.mark.parametrize("param", [1, 2, 3])
+    @given(st.integers())
+    def test_parameterized(param, n):
+        pass
+    """
+
+    assert collect_names(code) == {"test_parameterized"}

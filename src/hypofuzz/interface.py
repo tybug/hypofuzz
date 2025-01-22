@@ -38,7 +38,7 @@ class _ItemsCollector:
 
             # from pytest 8.3 or thereabouts
             pytest83 = get_type_hints(manager._getautousenames).get("node") == Node
-            autouse_names = tuple(
+            autouse_names = set(
                 manager._getautousenames(item if pytest83 else item.nodeid)
             )
 
@@ -54,6 +54,12 @@ class _ItemsCollector:
                 # pytest ~6-7
                 _, all_autouse, _ = manager.getfixtureclosure(autouse_names, item)
 
+            all_autouse = set(all_autouse)
+            # from @pytest.mark.parametrize. Pytest gives us the params and their
+            # values directly, so we can pass them as extra kwargs to FuzzProcess.
+            params = item.callspec.params if hasattr(item, "callspec") else {}
+            param_names = set(params)
+
             # Skip any test which:
             # - directly requests a non autouse fixture, or
             # - requests any fixture (in its transitive closure) that isn't autouse
@@ -61,18 +67,23 @@ class _ItemsCollector:
             # We check both to handle the case where a function directly requests
             # a non autouse fixture, *and* that same fixture is requested by an
             # autouse fixture. This function should not be collected.
-            if (names := set(fixtureinfo.initialnames).difference(autouse_names)) or (
-                names := set(fixtureinfo.name2fixturedefs).difference(all_autouse)
+            #
+            # We also ignore any arguments from @pytest.mark.parametrize, which we know how to handle.
+            if (
+                names := set(fixtureinfo.initialnames).difference(
+                    autouse_names | param_names
+                )
+            ) or (
+                names := set(fixtureinfo.name2fixturedefs).difference(
+                    all_autouse | param_names
+                )
             ):
                 print(
                     f"skipping {item=} because of non-autouse fixtures {names}",
                     flush=True,
                 )
                 continue
-            # For parametrized tests, we have to pass the parametrized args into
-            # wrapped_test.hypothesis.get_strategy() to avoid trivial TypeErrors
-            # from missing required arguments.
-            extra_kw = item.callspec.params if hasattr(item, "callspec") else {}
+
             # Wrap it up in a FuzzTarget and we're done!
             try:
                 # Skip state-machine classes, since they're not
@@ -81,7 +92,7 @@ class _ItemsCollector:
                 else:
                     target = item.obj
                 fuzz = FuzzProcess.from_hypothesis_test(
-                    target, nodeid=item.nodeid, extra_kw=extra_kw
+                    target, nodeid=item.nodeid, extra_kw=params
                 )
                 self.fuzz_targets.append(fuzz)
             except Exception as err:
