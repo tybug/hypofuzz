@@ -98,6 +98,7 @@ class FuzzProcess:
             params=get_signature(wrapped_test).parameters,
         )
         return cls(
+            wrapped_test=wrapped_test,
             test_fn=wrapped_test.hypothesis.inner_test,
             stuff=stuff,
             nodeid=nodeid,
@@ -110,6 +111,7 @@ class FuzzProcess:
 
     def __init__(
         self,
+        wrapped_test: Callable,
         test_fn: Callable,
         stuff: Stuff,
         *,
@@ -120,6 +122,7 @@ class FuzzProcess:
     ) -> None:
         """Construct a FuzzProcess from specific arguments."""
         # The actual fuzzer implementation
+        self.wrapped_test = wrapped_test
         self.random = Random(random_seed)
         self._test_fn = test_fn
         self.__stuff = stuff
@@ -146,6 +149,7 @@ class FuzzProcess:
         # 1000 consecutive examples without new coverage, and then switch to mutation.
         self._early_blackbox_mode = True
         self._last_report: Report | None = None
+        self.failure_did_not_reproduce: bool = False
 
     def startup(self) -> None:
         """Set up initial state and prepare to replay the saved behaviour."""
@@ -211,7 +215,30 @@ class FuzzProcess:
             )
         )
 
+        # when we find a failure, we don't know yet whether it's a real failure.
+        # the test code may have an xfail wrapper (either using pytest or a custom
+        # one) which catches any exceptions. We do not want to report these as bugs.
+        #
+        # To check for this, we will:
+        # - save this failure to the tests' db (already done by pool.add!)
+        # - call wrapped_test(), relying on hypothesis to try our saved failure first
+        # - if this *fails*, this is a real failure. proceed to shrinking
+        # - if this *succeeds*, the failure didn't reproduce. This could either
+        #   be because the failure is flaky, or because wrapped_tests has an xfail
+        #   decorator. We can't distinguish the two, so be conservative in our messaging.
+
         if result.status is Status.INTERESTING:
+            marks = getattr(self.wrapped_test, "pytestmark", [])
+            if "xfail" in [mark.name for mark in marks]:
+                self.failure_did_not_reproduce = True
+            try:
+                self.wrapped_test(**self.__stuff.kwargs)
+            except Exception:
+                # TODO: check that the InterestingOrigin matches what we expect?
+                pass
+            else:
+                self.failure_did_not_reproduce = True
+
             # Shrink to our minimal failing example, since we'll stop after this.
             self.shrinking = True
             shrinker = get_shrinker(
@@ -406,7 +433,11 @@ class FuzzProcess:
                 else ("shrinking known examples" if self.pool._in_distill_phase else "")
             ),
         }
-        if self.pool.interesting_examples:
+        if self.failure_did_not_reproduce:
+            report["note"] = (
+                "found a failure, but did not reproduce (might be an xfail)"
+            )
+        elif self.pool.interesting_examples:
             report["note"] = (
                 f"raised {list(self.pool.interesting_examples)[0][0].__name__} "
                 f"({'shrinking...' if self.shrinking else 'finished'})"
@@ -446,7 +477,13 @@ def fuzz_several(*targets_: FuzzProcess, random_seed: Optional[int] = None) -> N
                 # pay our log-n cost to keep the list sorted
                 targets.add(targets.pop(0))
             elif targets[0].has_found_failure:
-                print(f"found failing example for {targets[0].nodeid}")
+                if targets[0].failure_did_not_reproduce:
+                    print(
+                        f"found failure for {targets[0].nodeid}, but it did not "
+                        "reproduce. This might be an xfail test or similar"
+                    )
+                else:
+                    print(f"found failing example for {targets[0].nodeid}")
                 targets.pop(0)
             if not targets:
                 return

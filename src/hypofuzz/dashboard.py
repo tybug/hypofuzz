@@ -18,7 +18,7 @@ from hypothesis.configuration import storage_directory
 from .database import get_db
 from .patching import make_and_save_patches
 
-DATA_TO_PLOT = []
+DATA_TO_PLOT = {}
 LAST_UPDATE: dict = {}
 
 PYTEST_ARGS = None
@@ -44,8 +44,9 @@ def poll_database() -> None:
         data.extend(db.fetch_metadata(key))
     data.sort(key=lambda d: d.get("ninputs", -1))
 
-    DATA_TO_PLOT = data
+    DATA_TO_PLOT = {}
     for d in data:
+        DATA_TO_PLOT[d["nodeid"]] = d
         LAST_UPDATE[d["nodeid"]] = d
 
 
@@ -118,7 +119,9 @@ def display_page(pathname: str) -> html.Div:
 
     # Target-specific subpages
     nodeid = pathname[1:]
-    trace = [d for d in DATA_TO_PLOT if d["nodeid"].replace("/", "_") == nodeid]
+    trace = [
+        d for d in DATA_TO_PLOT.values() if d["nodeid"].replace("/", "_") == nodeid
+    ]
     if not trace:
         return html.Div(
             children=[
@@ -201,7 +204,7 @@ def update_graph_live(n: int, clicks: int) -> object:
         poll_database()
 
     fig = px.line(
-        DATA_TO_PLOT,
+        DATA_TO_PLOT.values(),
         x="ninputs",
         y="branches",
         color="nodeid",
@@ -212,7 +215,7 @@ def update_graph_live(n: int, clicks: int) -> object:
     failing = {
         d["nodeid"]: (d["ninputs"], d["branches"])
         for d in LAST_UPDATE.values()
-        if d.get("status_counts", {}).get("INTERESTING", 0)
+        if "failures" in d
     }
     for k, v in failing.items():
         if k not in FIRST_FAILED_AT:
@@ -307,13 +310,19 @@ def download_patch(name: str) -> flask.Response:
 
 
 # api design is in flux and will likely evolve alongside our testing needs.
-@app.route("/api/state")  # type: ignore
+@app.route("/api/state/")  # type: ignore
 def api_state() -> flask.Response:
     # todo: poll on a fixed interval (even if the page isn't loaded) instead of
     # on every api request.
     poll_database()
     data = {"latest": LAST_UPDATE}
     return flask.jsonify(data)
+
+
+@app.route("/api/state/<path:node_id>")  # type: ignore
+def api_state_node(node_id) -> flask.Response:
+    poll_database()
+    return flask.jsonify(DATA_TO_PLOT[node_id])
 
 
 @app.route("/patches/")  # type: ignore

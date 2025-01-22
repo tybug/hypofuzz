@@ -2,6 +2,12 @@
 HypoFuzz uses [calendar-based versioning](https://calver.org/), with a
 `YY-MM-patch` format.
 
+## 25.01.5
+
+Add support for collecting tests which use `@pytest.mark.parametrize`.
+
+We now also detect when a test is expected to fail, such as with `@pytest.mark.xfail` or a custom decorator, and don't show failures for it on the dashboard. We don't (yet!) have good heuristics for distinguishing these xfails from flaky failures, so we continue to show a conservative note—but no longer show a failure marker on the dashboard.
+
 ## 25.01.4
 
 Ignore standard library and dynamically generated code for coverage.
