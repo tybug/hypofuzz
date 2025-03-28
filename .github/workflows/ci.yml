@@ -30,7 +30,16 @@ jobs:
         npm run format:check --prefix src/hypofuzz/frontend
 
   docs:
-    if: github.repository == 'tybug/hypofuzz' &&  github.ref == 'refs/heads/master'
+    if: >
+      github.repository == 'tybug/hypofuzz' && (
+        github.ref == 'refs/heads/master' ||
+        (
+          github.event_name == 'pull_request' && (
+            github.event.pull_request.user.login == 'tybug' ||
+            github.event.pull_request.user.login == 'Zac-HD'
+          )
+        )
+      )
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -45,17 +54,29 @@ jobs:
     - name: Build docs
       run: |
         python -m tox --recreate -e docs
-        npm run build --prefix src/hypofuzz/frontend -- --base=/example-dashboard
-        rm -rf docs/example-dashboard
-        cp -r src/hypofuzz/frontend/dist docs/example-dashboard
-    - name: Build docs and example dashboard
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          BASE="/preview-${{ github.event.pull_request.number }}"
+        else
+          BASE="/example-dashboard"
+        fi
+        npm run build --prefix src/hypofuzz/frontend -- --base=$BASE
+        rm -rf docs${BASE}
+        cp -r src/hypofuzz/frontend/dist docs${BASE}
+        cp docs-src/dashboard_state.json docs${BASE}/assets/dashboard_state.json
+    - name: Commit docs and example dashboard
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add --force docs/docs/
         git commit -m "build docs"
-        git add --force docs/example-dashboard
-        git commit -m "build example dashboard"
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          git add --force docs/preview-${PR_NUMBER}
+          git commit -m "#${PR_NUMBER} build example dashboard preview"
+        else
+          git add --force docs/example-dashboard
+          git commit -m "build example dashboard"
+        fi
         git push --force origin HEAD:gh-pages
 
   test:
