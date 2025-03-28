@@ -30,6 +30,7 @@ jobs:
         npm run format:check --prefix src/hypofuzz/frontend
 
   docs:
+    if: github.repository == 'tybug/hypofuzz' &&  github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -47,13 +48,14 @@ jobs:
         npm run build --prefix src/hypofuzz/frontend --base=/example-dashboard
         rm -rf docs/example-dashboard
         cp -r src/hypofuzz/frontend/dist docs/example-dashboard
-    - name: Commit and push docs
-      if: github.repository == 'tybug/hypofuzz' &&  github.ref == 'refs/heads/master'
+    - name: Build docs and example dashboard
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add --force docs/docs/
         git commit -m "build docs"
+        git add --force docs/example-dashboard
+        git commit -m "build example dashboard"
         git push --force origin HEAD:gh-pages
 
   test:
