@@ -45,7 +45,7 @@ jobs:
     - name: Build docs
       run: |
         python -m tox --recreate -e docs
-        npm run build --prefix src/hypofuzz/frontend --base=/example-dashboard
+        npm run build --prefix src/hypofuzz/frontend -- --base=/example-dashboard
         rm -rf docs/example-dashboard
         cp -r src/hypofuzz/frontend/dist docs/example-dashboard
     - name: Build docs and example dashboard
