@@ -38,12 +38,17 @@ jobs:
       with:
         python-version: "3.11"
     - name: Install dependencies
-      run: python -m pip install --upgrade pip setuptools tox
+      run: |
+        python -m pip install --upgrade pip setuptools tox
+        npm ci --prefix src/hypofuzz/frontend
     - name: Build docs
       run: |
         python -m tox --recreate -e docs
-    - name: Upload docs
-      if: github.repository == 'Zac-HD/hypofuzz' &&  github.ref == 'refs/heads/master'
+        npm run build --prefix src/hypofuzz/frontend --base=/example-dashboard
+        rm -rf docs/example-dashboard
+        cp -r src/hypofuzz/frontend/dist docs/example-dashboard
+    - name: Commit and push docs
+      if: github.repository == 'tybug/hypofuzz' &&  github.ref == 'refs/heads/master'
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
