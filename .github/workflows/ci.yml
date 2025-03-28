@@ -69,16 +69,10 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add --force docs/docs/
+        git add --force docs/${BASE}/docs/
         git commit -m "build docs"
-        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          git add --force docs/preview-${PR_NUMBER}
-          git commit -m "#${PR_NUMBER} build example dashboard preview"
-        else
-          git add --force docs/example-dashboard
-          git commit -m "build example dashboard"
-        fi
+        git add --force docs/${BASE}/example-dashboard
+        git commit -m "build example dashboard"
         git push --force origin HEAD:gh-pages
 
   test:
