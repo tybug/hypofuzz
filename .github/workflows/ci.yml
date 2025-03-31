@@ -64,32 +64,16 @@ jobs:
         HYPOFUZZ_DOCS_OUTPUT_DIR=docs/${BASE}/docs python -m tox --recreate -e docs
         npm run build --prefix src/hypofuzz/frontend -- --base=${BASE}/example-dashboard
 
-        echo "=== Debugging directory structure ==="
-        echo "Current working directory: $(pwd)"
-        echo "Contents of src/hypofuzz/frontend/dist:"
-        ls -la src/hypofuzz/frontend/dist
-        echo "Contents of src/hypofuzz/frontend/dist/assets (if exists):"
-        ls -la src/hypofuzz/frontend/dist/assets || echo "assets directory not found"
-
         rm -rf docs/${BASE}/example-dashboard
         mkdir -p docs/${BASE}/example-dashboard
 
-        echo "=== After creating example-dashboard directory ==="
-        echo "Target directory path: docs/${BASE}/example-dashboard"
-        ls -la docs/${BASE} || echo "Base directory not found"
+        echo "eeeeeeeeee1"
+        ls -R src/hypofuzz/frontend/dist
 
         cp -r src/hypofuzz/frontend/dist docs/${BASE}/example-dashboard
 
-        echo "=== After copying dist ==="
-        echo "Contents of example-dashboard:"
-        ls -la docs/${BASE}/example-dashboard
-        echo "Contents of assets directory (if exists):"
-        ls -la docs/${BASE}/example-dashboard/assets || echo "assets directory not found"
-
-        echo "=== Source file check ==="
-        echo "Does source file exist?"
-        ls -la docs-src/dashboard_state.json || echo "Source file not found"
-
+        echo "eeeeeeeeee2"
+        ls -R docs/${BASE}/example-dashboard
         cp docs-src/dashboard_state.json docs/${BASE}/example-dashboard/assets/dashboard_state.json
     - name: Commit docs and example dashboard
       run: |
