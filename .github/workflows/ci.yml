@@ -64,6 +64,7 @@ jobs:
         HYPOFUZZ_DOCS_OUTPUT_DIR=docs/${BASE}/docs python -m tox --recreate -e docs
         npm run build --prefix src/hypofuzz/frontend -- --base=${BASE}/example-dashboard
         rm -rf docs/${BASE}/example-dashboard
+        mkdir -p docs/${BASE}/example-dashboard
         cp -r src/hypofuzz/frontend/dist docs/${BASE}/example-dashboard
         cp docs-src/dashboard_state.json docs/${BASE}/example-dashboard/assets/dashboard_state.json
     - name: Commit docs and example dashboard
